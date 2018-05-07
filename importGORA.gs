@@ -6,10 +6,11 @@ function importGora() {
   var courseName;
   var row;
 
+  var sheetData = sheet.getRange(4,4,1000,2).getValues();
   for(var i = 0; i < 1000; i++){
-    if(sheet.getRange(i+4,4).getValue() !== '' && sheet.getRange(i+4,5).getValue() == ''){
+    if(sheetData[i][0] !== '' && sheetData[i][1] == ''){
       row = i+4;
-      courseName = sheet.getRange(i+4,4).getValue().replace(/CC(.*)/,'カントリー').replace(/G(.*)/,'ゴルフ').replace(/\[(.*)/,'');
+      courseName = sheetData[i][0].replace(/CC(.*)/,'カントリー').replace(/G(.*)/,'ゴルフ').replace(/\[(.*)/,'');
       break;
     }
     if(i == 999){
@@ -17,10 +18,9 @@ function importGora() {
       return;
     }
   }
-
   //コース名検索,候補ID抽出
 
-    var apiUrl =  'https://app.rakuten.co.jp/services/api/GORA/GORAGolfCourseSearch/20170623?format=xml&applicationId=1048505012573217366&keyword=' + courseName;
+    var apiUrl =  'https://app.rakuten.co.jp/services/api/Gora/GoraGolfCourseSearch/20170623?format=xml&applicationId=1048505012573217366&keyword=' + courseName;
     var apiXml = UrlFetchApp.fetch(apiUrl,{ muteHttpExceptions:true }).getContentText('UTF-8');
     courseIds = getTags(apiXml,'golfCourseId','<golfCourseId>','');
 
@@ -53,7 +53,7 @@ function importGora() {
   }
 
   //レイアウトページ取得
-  var layoutUrl = 'https://booking.GORA.golf.rakuten.co.jp/guide/layout_disp/c_id/' + courseId;
+  var layoutUrl = 'https://booking.Gora.golf.rakuten.co.jp/guide/layout_disp/c_id/' + courseId;
   var layoutHtml = UrlFetchApp.fetch(layoutUrl,{ muteHttpExceptions:true }).getContentText('x-euc-jp');
 
   //サブコース確定
@@ -103,7 +103,7 @@ function importGora() {
     inCourseNum = '2';
   }
   //レイアウトページ取得
-  var guideUrl = 'https://booking.GORA.golf.rakuten.co.jp/guide/disp/c_id/' + courseId;
+  var guideUrl = 'https://booking.Gora.golf.rakuten.co.jp/guide/disp/c_id/' + courseId;
   var guideHtml = UrlFetchApp.fetch(guideUrl,{ muteHttpExceptions:true }).getContentText('x-euc-jp');
 
   //グリーン・ティー取得
@@ -121,7 +121,8 @@ function importGora() {
       }
     }
   }
-  
+
+  //修正予定 : PARとヤーデージだけは入れる
   if(guideHtml.search(/<table(.*)class="tblInfo tblWordBreak mt05"(.*)>/) !== -1){
   var trs = getChildTags(guideHtml,[
     ['table','<table(.*)class="tblInfo tblWordBreak mt05"(.*)>','',subCourseCombiNum],
@@ -130,7 +131,7 @@ function importGora() {
     Browser.msgBox("楽天GORAに情報がありません。残念！")
     return;
   }
-  
+
 
   var greenNames = [];
   var teeNames = [];
@@ -197,15 +198,15 @@ function importGora() {
       }
     }
   }
-  
+
   //種別取得
   var courseType = getChildTags(guideHtml,[
-  ['dl','<dl class="clearfix">','<dt>種別</dt>',0],
-  ['dd','<dd>','']])[0].trim();
-
+    ['dl','<dl class="clearfix">','<dt>種別</dt>',0],
+    ['dd','<dd>','']])[0].trim();
+  
   
   //行コピー
-  sheet.getRange(sheet.getLastRow(), 10, 1, sheet.getLastColumn() - 9).copyTo(sheet.getRange(row, 10, 1, sheet.getLastColumn() - 9))  
+  sheet.getRange(sheet.getLastRow(), 10, 1, sheet.getLastColumn() - 9).copyTo(sheet.getRange(row, 10, 1, sheet.getLastColumn() - 9))
   sheet.getRange(sheet.getLastRow(), 10, 1, sheet.getLastColumn() - 9).copyTo(sheet.getRange(row, 10, 1, sheet.getLastColumn() - 9));
   
   //Par数入力
@@ -213,12 +214,12 @@ function importGora() {
     ['div','<div class="section clearfix">','',[outCourseNum - 1]],
     ['tr','<tr>','class="cSort">PAR</td>',0],
     ['td','<td class="ar">','']])
-
+  
   var inPars = getChildTags(layoutHtml,[
     ['div',' class="section clearfix"','',[inCourseNum - 1]],
     ['tr','<tr>','class="cSort">PAR</td>',0],
     ['td','<td class="ar">','']])
-
+  
   for(var i = 0; i < 9; i++){
     setData(row, 10+i, outPars[i].replace('&nbsp;',''));
     setData(row, 19+i, inPars[i].replace('&nbsp;',''));
@@ -232,7 +233,7 @@ function importGora() {
   
   //ヤーデージ入力
   setData(row, 7, teeNames[greenNum][teeNum][2].replace(',',''));
-  
+
 }
 
 
@@ -245,15 +246,15 @@ function setData(y,x,data){
 
 //tagType:'div'とか, tagReg:開始タグの正規表現, elementReg:中に含まれる要素の正規表現
 function getTags(xml,tagType,tagReg,elementReg){
-  var indexStartTags;
+  var indexStartTag;
   var xmls = [];
   tagReg = new RegExp(tagReg);
   elementReg = new RegExp(elementReg);
-  
+
   for (var i = 0;true;i++){
-    indexStartTags = xml.search(tagReg);
-    if(indexStartTags !== -1){
-      xml = xml.substring(indexStartTags + xml.match(tagReg)[0].length);
+    indexStartTag = xml.search(tagReg);
+    if(indexStartTag !== -1){
+      xml = xml.substring(indexStartTag + xml.match(tagReg)[0].length);
       var copyXml = xml;
       var index = 0;
       var endTagNum = 0; //開始タグに対する終了タグの数。これが1になったら親要素の終了タグとみなす
