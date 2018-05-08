@@ -7,19 +7,19 @@ function importGora() {
   var row;
 
   var sheetData = sheet.getRange(4,4,1000,2).getValues();
-  for(var i = 0; i < 1000; i++){
-    if(sheetData[i][0] !== '' && sheetData[i][1] == ''){
-      row = i+4;
-      courseName = sheetData[i][0].replace(/CC(.*)/,'カントリー').replace(/G(.*)/,'ゴルフ').replace(/\[(.*)/,'');
-      break;
+  sheetData.some(function(value,index){
+	  if(value[0] !== '' && value[1] == ''){
+      row = index+4;
+      courseName = value[0].replace(/CC(.*)/,'カントリー').replace(/G(.*)/,'ゴルフ').replace(/\[(.*)/,'');
+      return true;
     }
     if(i == 999){
       Browser.msgBox('ゴルフ場名を入力してください')
       return;
     }
-  }
-  //コース名検索,候補ID抽出
+  })
 
+  //コース名検索,候補ID抽出
     var apiUrl =  'https://app.rakuten.co.jp/services/api/Gora/GoraGolfCourseSearch/20170623?format=xml&applicationId=1048505012573217366&keyword=' + courseName;
     var apiXml = UrlFetchApp.fetch(apiUrl,{ muteHttpExceptions:true }).getContentText('UTF-8');
     courseIds = getTags(apiXml,'golfCourseId','<golfCourseId>','');
@@ -34,10 +34,10 @@ function importGora() {
     courseId = courseIds[0];
   }else{
     var popText = '該当する番号を入力してください\\n\\n';
-    for(var i = 0;i < courseIds.length;i++){
-      popText += i+1 + ". " + getTags(apiXml,'golfCourseName','<golfCourseName>','')[i];
+    courseIds.forEach(function(value,index){
+      popText += index+1 + ". " + getTags(apiXml,'golfCourseName','<golfCourseName>','')[index];
       popText += "\\n";
-    }
+    })
 
     while(true){
       var courseNum = Browser.inputBox('ゴルフ場選択',popText,Browser.Buttons.OK_CANCEL);
@@ -60,15 +60,15 @@ function importGora() {
   var subCourseNames = getTags(layoutHtml,'div','<div class="block-02-header">','');
   var outCourseNum;
   var inCourseNum;
-  for(var i = 0; i < subCourseNames.length; i++){
-    subCourseNames[i] = getTags(subCourseNames[i],'h2','<h2>','')[0];
-  }
+  subCourseNames.forEach(function(value,index,array){
+    array[index] = getTags(value,'h2','<h2>','')[0];
+  })
   if(subCourseNames.length > 2){
     var popText = '該当する番号を入力してください\\n\\n';
-    for(var i = 0;i < subCourseNames.length;i++){
-      popText += i+1 + ". " + subCourseNames[i];
+    subCourseNames.forEach(function(value,index){
+      popText += index+1 + ". " + value;
       popText += "\\n";
-    }
+    })
     while(true){
       outCourseNum = Browser.inputBox('前半のコースを選択してください',popText,Browser.Buttons.OK_CANCEL) ;
       if(outCourseNum == 'cancel'){
@@ -80,15 +80,16 @@ function importGora() {
         Browser.msgBox('正しい値を入力してください',Browser.Buttons.OK)
       }
     }
+    
     popText = '該当する番号を入力してください\\n\\n';
-    for(var i = 0;i < subCourseNames.length;i++){
-      if(i !== outCourseNum - 1){
-        popText += i+1 + ". " + subCourseNames[i];
+    subCourseNames.forEach(function(value,index){
+      if(index !== outCourseNum - 1){
+        popText += index+1 + ". " + value;
         popText += "\\n";
       }
-    }
+    })
     while(true){
-      inCourseNum = Browser.inputBox('前半のコースを選択してください',popText,Browser.Buttons.OK_CANCEL);
+      inCourseNum = Browser.inputBox('後半のコースを選択してください',popText,Browser.Buttons.OK_CANCEL);
       if(inCourseNum == 'cancel'){
         return;
       }
@@ -106,38 +107,37 @@ function importGora() {
   var guideUrl = 'https://booking.Gora.golf.rakuten.co.jp/guide/disp/c_id/' + courseId;
   var guideHtml = UrlFetchApp.fetch(guideUrl,{ muteHttpExceptions:true }).getContentText('x-euc-jp');
 
+  //修正予定 : PARとヤーデージだけは入れる
+  if(guideHtml.search(/<table(.*)class="tblInfo tblWordBreak mt05"(.*)>/) == -1){
+    Browser.msgBox("楽天GORAに情報がありません。残念！")
+    return;
+  }
+
   //グリーン・ティー取得
   var subCourseCombi = getTags(guideHtml,'p','<p class="mt10 wd_break">','')
   var subCourseCombiNum; //コースの組み合わせ。上から何番めか
   var outCourseName = subCourseNames[outCourseNum - 1].replace('コース','');
   var inCourseName = subCourseNames[inCourseNum - 1].replace('コース','');
+
   if(subCourseCombi.length < 2){
     subCourseCombiNum = 0;
   }else{
-    for(var i = 0; i < subCourseCombi.length; i++){
-      if(subCourseCombi[i].search(outCourseName) !== -1 && subCourseCombi[i].search(inCourseName) !== -1  ){
-        subCourseCombiNum = i;
-        break;
+    subCourseCombi.some(function(value,index){
+      if(value.search(outCourseName) !== -1 && value.search(inCourseName) !== -1  ){
+        subCourseCombiNum = index;
+        return true;
       }
-    }
+    })
   }
 
-  //修正予定 : PARとヤーデージだけは入れる
-  if(guideHtml.search(/<table(.*)class="tblInfo tblWordBreak mt05"(.*)>/) !== -1){
   var trs = getChildTags(guideHtml,[
     ['table','<table(.*)class="tblInfo tblWordBreak mt05"(.*)>','',subCourseCombiNum],
     ['tr','<tr>','td']]);
-  }else{
-    Browser.msgBox("楽天GORAに情報がありません。残念！")
-    return;
-  }
-
-
   var greenNames = [];
   var teeNames = [];
 
-  for(var i = 0; i < trs.length; i++){
-    var tds = getTags(trs[i],'td','<td([a-z]|[0-9]|"| |=)*>','');
+  trs.forEach(function(value){
+    var tds = getTags(value,'td','<td.*?>','');
     if(tds.length == 7){
       greenNames.push(tds[0]);
       teeNames.push([]);
@@ -149,7 +149,7 @@ function importGora() {
         teeNames[teeNames.length - 1].push([tds[0],tds[2],tds[4]]);
       }
     }
-  }
+  })
 
   //グリーン確定
   var greenNum;
@@ -157,10 +157,10 @@ function importGora() {
     greenNum = 0;
   }else{
     var popText = '該当する番号を入力してください\\n\\n';
-    for(var i = 0;i < greenNames.length;i++){
-      popText += i+1 + ". " + greenNames[i].trim();
+    greenNames.forEach(function(value,index){
+      popText += index+1 + ". " + value.trim();
       popText += "\\n";
-    }
+    })
 
     while(true){
       greenNum = Browser.inputBox('グリーン選択',popText,Browser.Buttons.OK_CANCEL);
@@ -181,10 +181,10 @@ function importGora() {
     teeNum = 0;
   }else{
     var popText = '該当する番号を入力してください\\n\\n';
-    for(var i = 0;i < teeNames[greenNum].length;i++){
-      popText += i+1 + ". " + teeNames[greenNum][i][0].trim();
+    teeNames[greenNum].forEach(function(value,index){
+      popText += index+1 + ". " + value[0].trim();
       popText += "\\n";
-    }
+    })
 
     while(true){
       teeNum = Browser.inputBox('ティー選択',popText,Browser.Buttons.OK_CANCEL);
@@ -203,34 +203,34 @@ function importGora() {
   var courseType = getChildTags(guideHtml,[
     ['dl','<dl class="clearfix">','<dt>種別</dt>',0],
     ['dd','<dd>','']])[0].trim();
-  
-  
+
+
   //行コピー
-  sheet.getRange(sheet.getLastRow(), 10, 1, sheet.getLastColumn() - 9).copyTo(sheet.getRange(row, 10, 1, sheet.getLastColumn() - 9))
   sheet.getRange(sheet.getLastRow(), 10, 1, sheet.getLastColumn() - 9).copyTo(sheet.getRange(row, 10, 1, sheet.getLastColumn() - 9));
-  
+  sheet.getRange(sheet.getLastRow(), 10, 1, sheet.getLastColumn() - 9).copyTo(sheet.getRange(row, 10, 1, sheet.getLastColumn() - 9));
+
   //Par数入力
   var outPars = getChildTags(layoutHtml,[
     ['div','<div class="section clearfix">','',[outCourseNum - 1]],
     ['tr','<tr>','class="cSort">PAR</td>',0],
     ['td','<td class="ar">','']])
-  
+
   var inPars = getChildTags(layoutHtml,[
     ['div',' class="section clearfix"','',[inCourseNum - 1]],
     ['tr','<tr>','class="cSort">PAR</td>',0],
     ['td','<td class="ar">','']])
-  
+
   for(var i = 0; i < 9; i++){
     setData(row, 10+i, outPars[i].replace('&nbsp;',''));
     setData(row, 19+i, inPars[i].replace('&nbsp;',''));
   }
-  
+
   //種別入力
   setData(row, 5, courseType);
-  
+
   //コースレート入力
   setData(row, 6, teeNames[greenNum][teeNum][1]);
-  
+
   //ヤーデージ入力
   setData(row, 7, teeNames[greenNum][teeNum][2].replace(',',''));
 
@@ -282,11 +282,11 @@ function getTags(xml,tagType,tagReg,elementReg){
 }
 
 function getChildTags(xml,array){
-  for(var i = 0; i < array.length; i++){
-    xml = getTags(xml,array[i][0],array[i][1],array[i][2]);
+  array.forEach(function(value){
+    xml = getTags(xml,value[0],value[1],value[2]);
     if(i !== array.length - 1){
-      xml = xml[array[i][3]];
+      xml = xml[value[3]];
     }
-  }
+  })
   return xml;
 }
