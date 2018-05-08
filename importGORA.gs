@@ -203,23 +203,24 @@ function importGora() {
   var courseType = getChildTags(guideHtml,[
     ['dl','<dl class="clearfix">','<dt>種別</dt>',0],
     ['dd','<dd>','']])[0].trim();
-
-
-  //行コピー
-  sheet.getRange(sheet.getLastRow(), 10, 1, sheet.getLastColumn() - 9).copyTo(sheet.getRange(row, 10, 1, sheet.getLastColumn() - 9));
-  sheet.getRange(sheet.getLastRow(), 10, 1, sheet.getLastColumn() - 9).copyTo(sheet.getRange(row, 10, 1, sheet.getLastColumn() - 9));
-
-  //Par数入力
+  
+  //Par数取得
   var outPars = getChildTags(layoutHtml,[
     ['div','<div class="section clearfix">','',[outCourseNum - 1]],
     ['tr','<tr>','class="cSort">PAR</td>',0],
     ['td','<td class="ar">','']])
-
+  
   var inPars = getChildTags(layoutHtml,[
     ['div',' class="section clearfix"','',[inCourseNum - 1]],
     ['tr','<tr>','class="cSort">PAR</td>',0],
     ['td','<td class="ar">','']])
-
+  
+  
+  //行コピー
+  sheet.getRange(sheet.getLastRow(), 10, 1, sheet.getLastColumn() - 9).copyTo(sheet.getRange(row, 10, 1, sheet.getLastColumn() - 9));
+  sheet.getRange(sheet.getLastRow(), 10, 1, sheet.getLastColumn() - 9).copyTo(sheet.getRange(row, 10, 1, sheet.getLastColumn() - 9));
+  
+  //Par数入力
   for(var i = 0; i < 9; i++){
     setData(row, 10+i, outPars[i].replace('&nbsp;',''));
     setData(row, 19+i, inPars[i].replace('&nbsp;',''));
@@ -282,9 +283,9 @@ function getTags(xml,tagType,tagReg,elementReg){
 }
 
 function getChildTags(xml,array){
-  array.forEach(function(value){
+  array.forEach(function(value,index){
     xml = getTags(xml,value[0],value[1],value[2]);
-    if(i !== array.length - 1){
+    if(index !== array.length - 1){
       xml = xml[value[3]];
     }
   })
